@@ -66,8 +66,8 @@ def get_pairs(cedict_fp):
 			multipair_word2[schar].append((tchar, len(word_pairs)))
 		multipair_word = multipair_word2
 
-			# tchar
-			# {tchar: {'count': len(words), 'words': words}}
+		# tchar
+		# {tchar: {'count': len(words), 'words': words}}
 
 		# Filter out duplicates etc.
 
@@ -104,7 +104,9 @@ def write_to_file():
 			spamwriter.writerows(data.items())		
 			# yaml.dump(output_word, f, allow_unicode=True)
 
-	
+def main():
+	if __name__ == '__main__':
+		write_to_file()
 
 
 

@@ -1,4 +1,4 @@
-from src.write_cedict_data import main
+from src.process_cedict import main
 
 if __name__ == '__main__':
 	main()
