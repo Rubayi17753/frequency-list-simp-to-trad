@@ -1,0 +1,5 @@
+freqlist_fp = 'data/bcc_literature.tsv'
+cedict_fp = 'data/cedict_ts.u8'
+multipair_word_fp = 'output/multipair_words.tsv'
+multipair_word_pair_fp = 'output/multipair_words.tsv'
+multipair_monochar_fp = 'output/monochars.tsv'
