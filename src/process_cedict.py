@@ -21,7 +21,7 @@ def screen_text(text: str, automaton) -> bool:
 def get_pairs(cedict_fp):
 
 	multipair_word = defaultdict(list)
-	multipair_monochar = list()
+	data_monochar, data_words = list(), list()
 	tmonochar_count = defaultdict(int)
 	multipair_var, multipair_var2 = list(), list()
 	
@@ -58,11 +58,13 @@ def get_pairs(cedict_fp):
 									multipair_var.append((i, sword, tword, glosses))						
 								else:
 									tmonochar_count[tword] += 1
-									multipair_monochar.append((i, sword, tword, glosses))
+									data_monochar.append((i, sword, tword, glosses))
+
 							else:
 								if screen_text(glosses, ahocorasick_automaton):
 									multipair_var2.append((i, sword, tword, glosses))
-								else:								
+								else:
+									data_words.append((i, sword, tword, glosses))				
 									for s, t in zip(schars, tchars):
 										multipair_word[(s, t)].append((sword, tword, s, t))
 								
@@ -77,8 +79,8 @@ def get_pairs(cedict_fp):
 
 		# Filter out duplicates etc.
 
-		multipair_monochar = [(s, t) for i, s, t, glosses in multipair_monochar]
-		multipair_monochar = list(dict.fromkeys(multipair_monochar))
+		data_words = [(s, t) for i, s, t, glosses in data_words]
+		data_words = list(dict.fromkeys(data_words))
 		
 		schars = [sword for sword, tword in multipair_monochar]
 		multipair_schars = list(schars)	# list() creates copy of list
@@ -89,7 +91,9 @@ def get_pairs(cedict_fp):
 		one_on_one_pairs = ([(s, t) for s, t in one_on_one if s != t])
 		one_on_one_singles = [s for s, t in one_on_one if s == t]
 
-		multipair_monochar = [(sword, tword) for sword, tword in tqdm(multipair_monochar) 
+		data_monochar = [(s, t) for i, s, t, glosses in data_monochar]
+		data_monochar = list(dict.fromkeys(data_monochar))
+		multipair_monochar = [(sword, tword) for sword, tword in tqdm(data_monochar) 
 							if sword in multipair_schars]
 
 		multipair_word = {schar : tchar_tups for schar, tchar_tups 
@@ -108,19 +112,25 @@ def get_pairs(cedict_fp):
 			multipair_word_pairs_simp.remove(entry)
 		multipair_word_pairs = [(s, t) for s, t, *_ in multipair_word_pairs if s not in multipair_word_pairs_simp]
 		multipair_word_pairs_ambig = [(s, t) for s, t, *_ in multipair_word_pairs if s in multipair_word_pairs_simp]
-		one_on_one_singles = [s for s, t in one_on_one if s == t]	
 
-		return (multipair_word, multipair_word_pairs, multipair_word_pairs_ambig, 
+		one_on_one_words = [x for x in data_words if x not in multipair_word_pairs]
+		one_on_one_words_pairs = ([(s, t) for s, t in one_on_one if s != t])
+		one_on_one_words_singles = [s for s, t in one_on_one if s == t]
+
+		output = (multipair_word, multipair_word_pairs, multipair_word_pairs_ambig, 
 				multipair_monochar, multipair_var, multipair_var2, 
-				one_on_one_pairs, one_on_one_singles)
+				one_on_one_pairs, one_on_one_singles,
+				one_on_one_words_pairs, one_on_one_words_singles,)
 
+		return {f'{x}': x  for x in output}
+	
 def main():
 
-	from directories import cedict_fp, cedict_target_fps
+	from directories import cedict_fp
 	from src.write_bulk_to_file import write_bulk_to_file
 
-	fps = cedict_target_fps
-	datas = get_pairs(cedict_fp)
+	fps = {f'data/output/{x}.tsv' for x in get_pairs(cedict_fp).keys()}
+	datas = get_pairs(cedict_fp).values()
 	write_bulk_to_file(fps, datas)
 
 

@@ -9,17 +9,16 @@ def get_freqdict(cedict_extracted, freqlist_fp):
 
 	output = defaultdict(int)
 
-	(multipair_word, multipair_word_pairs, multipair_word_pairs_ambig, 
-	multipair_monochar, multipair_var, multipair_var2, 
-	one_on_one_pairs, one_on_one_singles) = cedict_extracted
+	one_on_one_singles = set(cedict_extracted['one_on_one_singles'])
 
-	one_on_one_singles = set(one_on_one_singles)
-
-	one_on_one_pairs = dict(one_on_one_pairs)
+	one_on_one_pairs = dict(cedict_extracted['one_on_one_pairs'])
 	one_on_one_pairs_simp = set(one_on_one_pairs.keys())
 
-	multipair_word_pairs = dict(multipair_word_pairs)
+	multipair_word_pairs = dict(cedict_extracted['multipair_word_pairs'])
 	multipair_word_pairs_simp = set(multipair_word_pairs.keys())
+
+	multipair_word = cedict_extracted['multipair_word']
+	# not a very big dict
 
 	def wordlist_feeder(word, wordlist, verbose=False):
 
@@ -54,26 +53,13 @@ def get_freqdict(cedict_extracted, freqlist_fp):
 
 	return output
 
-def write_bulk_to_file(data):
-
-	from directories import cedict_fp, freqdict_target_fp
-		
-	with open(freqdict_target_fp, 'w', encoding='utf-8', newline='') as f:
-		print(f'Writing to {freqdict_target_fp}')
-		spamwriter = csv.writer(f, delimiter='\t')
-		if type(data) == dict:
-			spamwriter.writerows(data.items())
-		else:
-			spamwriter.writerows(data)
-		# yaml.dump(output_word, f, allow_unicode=True)
-
-
 def main():
 
 	from directories import cedict_fp, freqlist_fp, freqdict_target_fp
+	from src.write_bulk_to_file import write_bulk_to_file
 	
-	fps = freqdict_target_fp
+	fps = [freqdict_target_fp,]
 	cedict_extracted = get_pairs(cedict_fp)
-	datas = get_freqdict(cedict_extracted, freqlist_fp)
+	datas = [get_freqdict(cedict_extracted, freqlist_fp),]
 	write_bulk_to_file(fps, datas)
 
