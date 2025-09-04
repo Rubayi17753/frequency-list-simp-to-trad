@@ -14,16 +14,18 @@ def build_automaton(keywords):
 	return automaton
 
 def screen_text(text: str, automaton) -> bool:
-	# ChatGPT-generated
+	# ChatGPT-generated, edited
+	text = text.strip()
 	return any(True for _ in automaton.iter(text))
 
 def get_pairs(cedict_fp):
 
 	multipair_word = defaultdict(list)
-	tmonochar_count = defaultdict(int)
 	multipair_monochar = list()
+	tmonochar_count = defaultdict(int)
+	multipair_var, multipair_var2 = list(), list()
 	
-	keywords = ('variant', 'used in')
+	keywords = ('variant of', '/used in')
 	ahocorasick_automaton = build_automaton(keywords)
 
 	with open(cedict_fp, 'r', encoding='utf-8') as f:
@@ -50,20 +52,24 @@ def get_pairs(cedict_fp):
 						if len(tchars) != len(schars):
 							print('\t'.join((str(i), '>>' *row)))
 
-						else:							
+						else:	
 							if len(tword) == 1:
-								tmonochar_count[tword] += 1
-								multipair_monochar.append((i, tword, sword, glosses))
-							elif True:
-							# elif not screen_text(glosses, ahocorasick_automaton):
-								for tchar, schar in zip(tchars, schars):
-									multipair_word[(tchar, schar)].append((tword, sword))
+								if screen_text(glosses, ahocorasick_automaton):
+									multipair_var.append((i, sword, tword, glosses))						
+								else:
+									tmonochar_count[tword] += 1
+									multipair_monochar.append((i, sword, tword, glosses))
 							else:
-								multipair_var.append((i, tword, sword, glosses))
+								if screen_text(glosses, ahocorasick_automaton):
+									multipair_var2.append((i, sword, tword, glosses))
+								else:								
+									for s, t in zip(schars, tchars):
+										multipair_word[(s, t)].append((sword, tword, s, t))
+								
 		
 		multipair_word2 = defaultdict(list)
-		for (tchar, schar), word_pairs in multipair_word.items():
-			multipair_word2[schar].append((tchar, len(word_pairs)))
+		for (s, t), word_pairs in multipair_word.items():
+			multipair_word2[s].append((t, len(word_pairs), word_pairs))
 		multipair_word = multipair_word2
 
 		# tchar
@@ -71,42 +77,51 @@ def get_pairs(cedict_fp):
 
 		# Filter out duplicates etc.
 
-		multipair_word = {schar : tchar_tups for schar, tchar_tups in tqdm(multipair_word.items()) 
-							if len(tchar_tups) > 1}
-		
-		multipair_word_pair = list()
-		for tchar_tups in multipair_word.values():
-			multipair_word_pair.extend(tchar_tups)
-		
-		multipair_monochar = [(tword, sword) for i, tword, sword, glosses in multipair_monochar]
+		multipair_monochar = [(s, t) for i, s, t, glosses in multipair_monochar]
 		multipair_monochar = list(dict.fromkeys(multipair_monochar))
 		
-		sword_list = [sword for tword, sword in multipair_monochar]
-		for entry in set(sword_list):
-			sword_list.remove(entry)	
+		schars = [sword for sword, tword in multipair_monochar]
+		multipair_schars = list(schars)	# list() creates copy of list
 
-		multipair_monochar = [(tword, sword) for tword, sword in tqdm(multipair_monochar) 
-							if sword in sword_list]
+		for entry in tqdm(set(schars)):
+			multipair_schars.remove(entry)
+		one_on_one = [(s, t) for s, t in multipair_monochar if s not in multipair_schars]
+		one_on_one_pairs = ([(s, t) for s, t in one_on_one if s != t])
+		one_on_one_singles = [s for s, t in one_on_one if s == t]
+
+		multipair_monochar = [(sword, tword) for sword, tword in tqdm(multipair_monochar) 
+							if sword in multipair_schars]
+
+		multipair_word = {schar : tchar_tups for schar, tchar_tups 
+							in tqdm(multipair_word.items()) if schar in multipair_schars}
+							# len(tchar_tups) > 1
 		
-		return multipair_word, multipair_word_pair, multipair_monochar
+		multipair_word_pairs = list()
+		for tchar_tups in multipair_word.values():
+			for x in tchar_tups:
+				word_pair = x[2]
+				multipair_word_pairs.extend(word_pair)
 
+		multipair_word_pairs_simp = [s for s, t, *_ in multipair_word_pairs]
 
-def write_to_file():
+		for entry in tqdm(set(multipair_word_pairs_simp)):
+			multipair_word_pairs_simp.remove(entry)
+		multipair_word_pairs = [(s, t) for s, t, *_ in multipair_word_pairs if s not in multipair_word_pairs_simp]
+		multipair_word_pairs_ambig = [(s, t) for s, t, *_ in multipair_word_pairs if s in multipair_word_pairs_simp]
+		one_on_one_singles = [s for s, t in one_on_one if s == t]	
 
-	from directories import cedict_fp
-	from directories import multipair_word_fp, multipair_word_pair_fp, multipair_monochar_fp
-	fps = multipair_word_fp, multipair_word_pair_fp, multipair_monochar_fp
-	
-	for fp, data in zip(fps, get_pairs(cedict_fp)):
-		with open(fp, 'w', encoding='utf-8', newline='') as f:
-			print(f'Writing to {fp}')
-			spamwriter = csv.writer(f, delimiter='\t')
-			spamwriter.writerows(data.items())		
-			# yaml.dump(output_word, f, allow_unicode=True)
+		return (multipair_word, multipair_word_pairs, multipair_word_pairs_ambig, 
+				multipair_monochar, multipair_var, multipair_var2, 
+				one_on_one_pairs, one_on_one_singles)
 
 def main():
-	if __name__ == '__main__':
-		write_to_file()
+
+	from directories import cedict_fp, cedict_target_fps
+	from src.write_bulk_to_file import write_bulk_to_file
+
+	fps = cedict_target_fps
+	datas = get_pairs(cedict_fp)
+	write_bulk_to_file(fps, datas)
 
 
 
