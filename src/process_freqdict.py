@@ -29,9 +29,9 @@ def group_cedict_data(cedict_data):
 def get_freqdict(cedict_data, freqlist_fp):
 
 	output = defaultdict(int)
-	output_ambiguous = defaultdict(list)
+	output_ambiguous, output_ambiguous2 = defaultdict(list), defaultdict(list)
 
-	def wordlist_feeder1(word, wordlist, verbose=False):
+	def wordlist_feeder(word, wordlist, verbose=False):
 
 		entry = list()
 		for char in parse_string_with_unicode(word):
@@ -57,22 +57,25 @@ def get_freqdict(cedict_data, freqlist_fp):
 			word, freq = row
 			wordlist = list()
 
-			if not wordlist_feeder1(word, wordlist):
+			if not wordlist_feeder(word, wordlist):
 				for seq in jieba.cut(word):
-					if not wordlist_feeder1(seq, wordlist):
+					if not wordlist_feeder(seq, wordlist):
 						for subseq in jieba.cut(word):
-							if not wordlist_feeder1(seq, wordlist):
+							if not wordlist_feeder(subseq, wordlist):
 								for char in parse_string_with_unicode(subseq):
-									entry = wordlist_feeder1(char, wordlist)
+									entry = wordlist_feeder((char,), wordlist)
 									if not entry:
-										ent = f'{char}*'
-										wordlist.append(ent)
-										output_ambiguous[char].append(word)
+										if char in cedict_data['multipair_chars']:
+											ent = f'{char}*'
+											wordlist.append(ent)
+											output_ambiguous[char].append(word)
+										else:
+											output_ambiguous2[char].append(word)
 
 			for entry in wordlist:
 				output[entry] += int(freq)
 
-	return output, output_ambiguous
+	return output, output_ambiguous, output_ambiguous2
 
 def main():
 
@@ -82,11 +85,11 @@ def main():
 	cedict_data = get_cedict_data(cedict_fp)
 	cedict_data = group_cedict_data(cedict_data)
 
-	freqdict, freqdict_amb = get_freqdict(cedict_data, freqlist_fp)
+	freqdict, amb, amb2 = get_freqdict(cedict_data, freqlist_fp)
 
-	fps_names = ('freqdict', 'freqdict_amb')
+	fps_names = ('freqdict', 'amb', 'amb2')
 	fps = [f'output/freqlist/{x}.tsv' for x in fps_names]
-	datas = [freqdict, freqdict_amb,]
+	datas = [freqdict, amb, amb2,]
 
 	write_bulk_to_file(fps, datas)
 

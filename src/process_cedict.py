@@ -25,7 +25,7 @@ def get_cedict_data(cedict_fp):
 	tmonochar_count = defaultdict(int)
 	multipair_var, multipair_var2 = list(), list()
 	
-	keywords = ('variant of', '/used in')
+	keywords = ('variant of')
 	ahocorasick_automaton = build_automaton(keywords)
 
 	with open(cedict_fp, 'r', encoding='utf-8') as f:
@@ -53,7 +53,7 @@ def get_cedict_data(cedict_fp):
 							print('\t'.join((str(i), '>>' *row)))
 
 						else:	
-							if screen_text(glosses, ahocorasick_automaton):
+							if screen_text(glosses, ahocorasick_automaton) and glosses.count('/') <= 2:
 								tup = (i, sword, tword, glosses)
 								if len(tchars) == 1:
 									multipair_var.append(tup)						
