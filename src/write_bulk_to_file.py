@@ -3,18 +3,19 @@ from collections import defaultdict
 
 def write_bulk_to_file(fps, datas, format='csv'):
 
-	for fp, data in zip(fps, datas):
-		
+	for fp, data in zip(fps, datas):		
 		print(f'Writing to {fp}')
-
 		with open(fp, 'w', encoding='utf-8', newline='') as f:
-			
-			if format == 'csv':
-				spamwriter = csv.writer(f, delimiter='\t')
-				if type(data) in (dict, defaultdict):
-					spamwriter.writerows(data.items())
-				else:
-					spamwriter.writerows(data)
-			
-			elif format == 'yaml':
-				yaml.dump(data, f, allow_unicode=True)
+			if data:
+
+				if format == 'csv':
+					spamwriter = csv.writer(f, delimiter='\t')
+					if type(data) in (dict, defaultdict):
+						spamwriter.writerows(data.items())
+					elif type(data) == list and type(data[0]) == str:
+						f.write('\n'.join(data))
+					else:
+						spamwriter.writerows(data)
+				
+				elif format == 'yaml':
+					yaml.dump(data, f, allow_unicode=True)

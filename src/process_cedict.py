@@ -18,12 +18,13 @@ def screen_text(text: str, automaton) -> bool:
 	text = text.strip()
 	return any(True for _ in automaton.iter(text))
 
-def get_cedict_data(cedict_fp):
+def get_cedict_data(cedict_fp, mode='s2t'):
 
 	multipair_word = defaultdict(list)
 	data_monochar, data_words = list(), list()
 	tmonochar_count = defaultdict(int)
 	multipair_var, multipair_var2 = list(), list()
+	cedict_s, cedict_t = list(), list()
 	
 	keywords = ('variant of', )
 	ahocorasick_automaton = build_automaton(keywords)
@@ -38,21 +39,33 @@ def get_cedict_data(cedict_fp):
 					print('\t'.join((str(i), '!!', *row)))
 				
 				else:
-					tword_sword, pinyin, glosses, *_ = row.strip().split('\t')
-					tword_sword = tword_sword.strip()
+					word_pair, pinyin, glosses, *_ = row.strip().split('\t')
+					word_pair = word_pair.strip()
 
-					if tword_sword.count(' ') != 1:
+					if word_pair.count(' ') != 1:
 						print(' '.join((str(i), '!!', *row)))
 
 					else:
-						tword, sword = tword_sword.split(' ')
+
+						if mode == 's2t':
+							tword, sword = word_pair.split(' ')
+						elif mode == 't2s':
+							sword, tword = word_pair.split(' ')
+
+						cedict_t.append(tword)
+						cedict_s.append(sword)
+
 						tchars = parse_string_with_unicode(tword)
 						schars = parse_string_with_unicode(sword)
 
 						if len(tword) != len(sword):
 							print('\t'.join((str(i), '>>' *row)))
 
-						else:	
+						else:
+
+							# cedict_t.extend(tchars)
+							# cedict_s.extend(schars)
+
 							if screen_text(glosses, ahocorasick_automaton) and glosses.count('/') <= 2:
 								tup = (i, sword, tword, glosses)
 								if len(tchars) == 1:
@@ -71,8 +84,10 @@ def get_cedict_data(cedict_fp):
 								
 		
 		multipair_word2 = defaultdict(list)
+		multipair_word3 = defaultdict(list)
 		for (s, t), word_pairs in multipair_word.items():
 			multipair_word2[s].append((t, len(word_pairs), word_pairs))
+			multipair_word3[s].append(t)
 		multipair_word = multipair_word2
 
 		# tchar
@@ -99,18 +114,20 @@ def get_cedict_data(cedict_fp):
 							in tqdm(multipair_word.items()) if schar in multipair_schars}
 							# len(tchar_tups) > 1
 
+		multipair_word3 = {schar : tchar_tups for schar, tchar_tups
+							in tqdm(multipair_word3.items()) if schar in multipair_schars and len(tchar_tups) > 1}
+
 		multipair_word_pairs = list()
 		for tchar_tups in multipair_word.values():
 			for x in tchar_tups:
 				word_pair = x[2]
 				multipair_word_pairs.extend(word_pair)
 
-		multipair_word_pairs_simp = [s for s, t, *_ in multipair_word_pairs]
+		multipair_word_pairs_s = [s for s, t, *_ in multipair_word_pairs]
+		counts = Counter(multipair_word_pairs)
 
-		for entry in tqdm(set(multipair_word_pairs_simp)):
-			multipair_word_pairs_simp.remove(entry)
-		multipair_word_pairs = [(s, t) for s, t, *_ in multipair_word_pairs if s not in multipair_word_pairs_simp]
-		multipair_word_pairs_ambig = [(s, t) for s, t, *_ in multipair_word_pairs if s in multipair_word_pairs_simp]
+		multipair_word_pairs = [(s, t) for s, t, *_ in multipair_word_pairs]
+		multipair_word_pairs_ambig = [(s, t) for s, t, *_ in multipair_word_pairs if counts[s] > 1]
 
 		data_words = [(s, t) for i, s, t, glosses in data_words]
 		data_words = list(dict.fromkeys(data_words))
@@ -123,24 +140,12 @@ def get_cedict_data(cedict_fp):
 		cedict_pairs_ambig = ([(s, t) for s, t in cedict_pairs if counts[s] > 1])
 		cedict_singles = [s for s, t in data_words if s == t]
 
-		catalogue = ('multipair_word', 'multipair_word_pairs', 'multipair_word_pairs_ambig', 
+		catalogue = ('multipair_word', 'multipair_word3', 
+			   	'multipair_word_pairs', 'multipair_word_pairs_ambig', 
 				'multipair_monochar', 'multipair_var', 'multipair_var2', 
 				'one_on_one_pairs', 'one_on_one_singles',
+				'cedict_s', 'cedict_t',
 				'cedict_pairs', 'cedict_pairs_ambig', 'cedict_singles',)
 
 		return {x: locals().get(x, None) for x in catalogue}
-	
-def main():
-
-	from directories import cedict_fp
-	from src.write_bulk_to_file import write_bulk_to_file
-
-	cedict_data = get_cedict_data(cedict_fp)
-	fps = [f'output/cedict/{x}.tsv' for x in cedict_data.keys()]
-	datas = cedict_data.values()
-
-	write_bulk_to_file(fps, datas)
-
-
-
 			 
