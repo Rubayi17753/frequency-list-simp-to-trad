@@ -18,7 +18,7 @@ def screen_text(text: str, automaton) -> bool:
 	text = text.strip()
 	return any(True for _ in automaton.iter(text))
 
-def get_pairs(cedict_fp):
+def get_cedict_data(cedict_fp):
 
 	multipair_word = defaultdict(list)
 	data_monochar, data_words = list(), list()
@@ -49,20 +49,21 @@ def get_pairs(cedict_fp):
 						tchars = parse_string_with_unicode(tword)
 						schars = parse_string_with_unicode(sword)
 
-						if len(tchars) != len(schars):
+						if len(tword) != len(sword):
 							print('\t'.join((str(i), '>>' *row)))
 
 						else:	
-							if len(tword) == 1:
-								if screen_text(glosses, ahocorasick_automaton):
-									multipair_var.append((i, sword, tword, glosses))						
+							if screen_text(glosses, ahocorasick_automaton):
+								tup = (i, sword, tword, glosses)
+								if len(tchars) == 1:
+									multipair_var.append(tup)						
 								else:
+									multipair_var2.append(tup)
+									
+							else:
+								if len(tchars) == 1:
 									tmonochar_count[tword] += 1
 									data_monochar.append((i, sword, tword, glosses))
-
-							else:
-								if screen_text(glosses, ahocorasick_automaton):
-									multipair_var2.append((i, sword, tword, glosses))
 								else:
 									data_words.append((i, sword, tword, glosses))				
 									for s, t in zip(schars, tchars):
@@ -79,27 +80,25 @@ def get_pairs(cedict_fp):
 
 		# Filter out duplicates etc.
 
-		data_words = [(s, t) for i, s, t, glosses in data_words]
-		data_words = list(dict.fromkeys(data_words))
-		
-		schars = [sword for sword, tword in multipair_monochar]
+		data_monochar = [(s, t) for i, s, t, glosses in data_monochar]
+		data_monochar = list(dict.fromkeys(data_monochar))
+
+		schars = [sword for sword, tword in tqdm(data_monochar)]
 		multipair_schars = list(schars)	# list() creates copy of list
 
 		for entry in tqdm(set(schars)):
 			multipair_schars.remove(entry)
-		one_on_one = [(s, t) for s, t in multipair_monochar if s not in multipair_schars]
+
+		multipair_monochar = [(s, t) for s, t in tqdm(data_monochar) if s in multipair_schars]
+
+		one_on_one = [(s, t) for s, t in tqdm(data_monochar) if s not in multipair_schars]
 		one_on_one_pairs = ([(s, t) for s, t in one_on_one if s != t])
 		one_on_one_singles = [s for s, t in one_on_one if s == t]
-
-		data_monochar = [(s, t) for i, s, t, glosses in data_monochar]
-		data_monochar = list(dict.fromkeys(data_monochar))
-		multipair_monochar = [(sword, tword) for sword, tword in tqdm(data_monochar) 
-							if sword in multipair_schars]
 
 		multipair_word = {schar : tchar_tups for schar, tchar_tups 
 							in tqdm(multipair_word.items()) if schar in multipair_schars}
 							# len(tchar_tups) > 1
-		
+
 		multipair_word_pairs = list()
 		for tchar_tups in multipair_word.values():
 			for x in tchar_tups:
@@ -113,24 +112,27 @@ def get_pairs(cedict_fp):
 		multipair_word_pairs = [(s, t) for s, t, *_ in multipair_word_pairs if s not in multipair_word_pairs_simp]
 		multipair_word_pairs_ambig = [(s, t) for s, t, *_ in multipair_word_pairs if s in multipair_word_pairs_simp]
 
-		one_on_one_words = [x for x in data_words if x not in multipair_word_pairs]
-		one_on_one_words_pairs = ([(s, t) for s, t in one_on_one if s != t])
-		one_on_one_words_singles = [s for s, t in one_on_one if s == t]
+		data_words = [(s, t) for i, s, t, glosses in data_words]
+		data_words = list(dict.fromkeys(data_words))
+		cedict_pairs = ([(s, t) for s, t in data_words if s != t])
+		cedict_singles = [s for s, t in data_words if s == t]
 
-		output = (multipair_word, multipair_word_pairs, multipair_word_pairs_ambig, 
-				multipair_monochar, multipair_var, multipair_var2, 
-				one_on_one_pairs, one_on_one_singles,
-				one_on_one_words_pairs, one_on_one_words_singles,)
+		catalogue = ('multipair_word', 'multipair_word_pairs', 'multipair_word_pairs_ambig', 
+				'multipair_monochar', 'multipair_var', 'multipair_var2', 
+				'one_on_one_pairs', 'one_on_one_singles',
+				'cedict_pairs', 'cedict_singles',)
 
-		return {f'{x}': x  for x in output}
+		return {x: locals().get(x, None) for x in catalogue}
 	
 def main():
 
 	from directories import cedict_fp
 	from src.write_bulk_to_file import write_bulk_to_file
 
-	fps = {f'data/output/{x}.tsv' for x in get_pairs(cedict_fp).keys()}
-	datas = get_pairs(cedict_fp).values()
+	cedict_data = get_cedict_data(cedict_fp)
+	fps = [f'output/cedict/{x}.tsv' for x in cedict_data.keys()]
+	datas = cedict_data.values()
+
 	write_bulk_to_file(fps, datas)
 
 

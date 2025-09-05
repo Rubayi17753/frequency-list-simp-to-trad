@@ -1,40 +1,69 @@
 import csv
 import jieba
+import pdb
 from collections import defaultdict
 from tqdm import tqdm
 
-from src.process_cedict import get_pairs
+from src.process_cedict import get_cedict_data
 
-def get_freqdict(cedict_extracted, freqlist_fp):
+def group_cedict_data(cedict_data):
+
+	singles = cedict_data['one_on_one_singles']
+	singles.extend(cedict_data['cedict_singles'])
+	singles_simp = set(singles)
+
+	monopairs = dict(cedict_data['one_on_one_pairs'])
+	monopairs.update(dict(cedict_data['cedict_pairs']))
+	monopairs.update(dict(cedict_data['multipair_word_pairs']))
+	monopairs_simp = set(monopairs.keys())
+
+	multipair_chars = dict(cedict_data['multipair_monochar'])
+	# not a very big dict
+
+	print('CEDICT data prepared')
+	
+	catalogue = ('singles', 'monopairs', 'multipair_chars', 'singles_simp', 'monopairs_simp')
+	return {x: locals().get(x, None) for x in catalogue}
+
+def get_freqdict(cedict_data, freqlist_fp):
 
 	output = defaultdict(int)
-
-	one_on_one_singles = set(cedict_extracted['one_on_one_singles'])
-
-	one_on_one_pairs = dict(cedict_extracted['one_on_one_pairs'])
-	one_on_one_pairs_simp = set(one_on_one_pairs.keys())
-
-	multipair_word_pairs = dict(cedict_extracted['multipair_word_pairs'])
-	multipair_word_pairs_simp = set(multipair_word_pairs.keys())
-
-	multipair_word = cedict_extracted['multipair_word']
-	# not a very big dict
+	output_ambiguous = defaultdict(list)
 
 	def wordlist_feeder(word, wordlist, verbose=False):
 
 		entry = ''
-		if word in one_on_one_singles:
+		if word in cedict_data['singles_simp']:
 			entry = word
-		elif word in one_on_one_pairs_simp:
-			entry = one_on_one_pairs[word]
-		elif word in multipair_word_pairs_simp:
-			entry = multipair_word_pairs[word]
-		elif word in multipair_word:
-			entry = f'{multipair_word}*'
+		elif word in cedict_data['monopairs_simp']:
+			entry = cedict_data['monopairs'][word]
+		elif word in cedict_data['multipair_chars']:
+			entry = f'{word}*'
 		elif verbose:
 			print(f'!! {word}')
 		
 		wordlist.append(entry)
+		return entry
+	
+	def wordlist_feeder2(word, wordlist, verbose=False):
+
+		# breakpoint()
+
+		entry = list()
+		for char in word:
+			if char in cedict_data['singles_simp']:
+				entry = char
+			elif char in cedict_data['monopairs_simp']:
+				entry = cedict_data['monopairs'][char]
+			else:
+				entry = '!!'	
+		
+		if '!!' in entry:
+			entry = list()
+		else:
+			for char in entry:
+				wordlist.append(entry)
+
 		return entry
 
 	with open(freqlist_fp, 'r', encoding='utf-8', newline='') as csvfile:
@@ -44,22 +73,38 @@ def get_freqdict(cedict_extracted, freqlist_fp):
 			word, freq = row
 			wordlist = list()
 
-			if not wordlist_feeder(word, wordlist):
-				for seq in jieba.cut(word):
-					wordlist_feeder(seq, wordlist, verbose=True)
+			if not wordlist_feeder2(word, wordlist):
+				if not wordlist_feeder(word, wordlist):
+					for seq in jieba.cut(word):
+						if not wordlist_feeder(seq, wordlist):
+							for subseq in jieba.cut(word):
+								if not wordlist_feeder(subseq, wordlist):
+									for char in subseq:
+										entry = wordlist_feeder(char, wordlist)
+										if not entry:
+											ent = f'{char}*'
+											wordlist.append(ent)
+											output_ambiguous[char].append(word)
 
 			for entry in wordlist:
 				output[entry] += int(freq)
 
-	return output
+	return output, output_ambiguous
 
 def main():
 
-	from directories import cedict_fp, freqlist_fp, freqdict_target_fp
+	from directories import cedict_fp, freqlist_fp
 	from src.write_bulk_to_file import write_bulk_to_file
 	
-	fps = [freqdict_target_fp,]
-	cedict_extracted = get_pairs(cedict_fp)
-	datas = [get_freqdict(cedict_extracted, freqlist_fp),]
+	cedict_data = get_cedict_data(cedict_fp)
+	cedict_data = group_cedict_data(cedict_data)
+
+	data, data_ambiguous = get_freqdict(cedict_data, freqlist_fp)
+
+	fps_names = ('freqdict', 'freqdict_amb')
+	fps = [f'output/freqlist/{locals().get(x, None)}' for x in fps_names]
+
+	datas = [data, data_ambiguous,]
+
 	write_bulk_to_file(fps, datas)
 
