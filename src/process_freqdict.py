@@ -37,38 +37,42 @@ def get_freqdict(cedict_data, freqlist_fp):
 
 	def wordlist_feeder(word, wordlist, verbose=False):
 
+		ambig = None
 		entry = list()
 
 		tchars = cedict_data['multipair_word_pairs'].get(word, '')
 
-		if word in cedict_data['cedict_pairs_ambig']:
-			for char in parse_string_with_unicode(word):
-				tchar = cedict_data['monopairs'].get(char, '')
-				if tchar:
-					entry.append((char, tchar))
-				else:
-					entry.append((f'{char}*', f'! {word}'))
+		if tchars:
 
-		elif tchars:
 			word = parse_string_with_unicode(word)
 			tchars = parse_string_with_unicode(tchars)
 			entry.extend(zip(word, tchars))
 
 		else:
+
+
+		
 			for char in parse_string_with_unicode(word):
 
 				tchar = ''
-				tchars = ''
 
 				if char in cedict_data['singles']:
 					tchar = char
+
 				elif not tchar:
-					tchar = cedict_data['monopairs'].get(char, '')
+
+					if word in cedict_data['cedict_pairs_ambig']:
+						ambig = True
+					else:
+						tchar = cedict_data['monopairs'].get(char, '')
+					
 				else:
 					tchar = '!!'
 
 				if tchar:
-					entry.append(((char, tchar)))
+					entry.append((char, tchar))
+				elif ambig:
+					entry.append((f'{char}*', f'! {word}'))
 
 		if '!!' in entry:
 			entry = list()
