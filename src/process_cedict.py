@@ -1,7 +1,7 @@
 import csv, copy
 import ahocorasick
 from tqdm import tqdm
-from collections import defaultdict
+from collections import defaultdict, Counter
 
 from src.parse_string_unic import parse_string_with_unicode
 
@@ -25,7 +25,7 @@ def get_cedict_data(cedict_fp):
 	tmonochar_count = defaultdict(int)
 	multipair_var, multipair_var2 = list(), list()
 	
-	keywords = ('variant of')
+	keywords = ('variant of', )
 	ahocorasick_automaton = build_automaton(keywords)
 
 	with open(cedict_fp, 'r', encoding='utf-8') as f:
@@ -114,13 +114,19 @@ def get_cedict_data(cedict_fp):
 
 		data_words = [(s, t) for i, s, t, glosses in data_words]
 		data_words = list(dict.fromkeys(data_words))
-		cedict_pairs = ([(s, t) for s, t in data_words if s != t])
+
+		cedict_pairs = [(s, t) for s, t in data_words if s != t]
+
+		cedict_s = [s for s, t in data_words]
+		counts = Counter(cedict_s)
+
+		cedict_pairs_ambig = ([(s, t) for s, t in cedict_pairs if counts[s] > 1])
 		cedict_singles = [s for s, t in data_words if s == t]
 
 		catalogue = ('multipair_word', 'multipair_word_pairs', 'multipair_word_pairs_ambig', 
 				'multipair_monochar', 'multipair_var', 'multipair_var2', 
 				'one_on_one_pairs', 'one_on_one_singles',
-				'cedict_pairs', 'cedict_singles',)
+				'cedict_pairs', 'cedict_pairs_ambig', 'cedict_singles',)
 
 		return {x: locals().get(x, None) for x in catalogue}
 	
