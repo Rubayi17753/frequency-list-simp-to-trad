@@ -1,4 +1,5 @@
 import csv, yaml
+from collections import defaultdict
 
 def write_bulk_to_file(fps, datas, format='csv'):
 
@@ -10,7 +11,7 @@ def write_bulk_to_file(fps, datas, format='csv'):
 			
 			if format == 'csv':
 				spamwriter = csv.writer(f, delimiter='\t')
-				if type(data) == dict:
+				if type(data) in (dict, defaultdict):
 					spamwriter.writerows(data.items())
 				else:
 					spamwriter.writerows(data)

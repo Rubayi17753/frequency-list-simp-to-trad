@@ -4,6 +4,7 @@ import pdb
 from collections import defaultdict
 from tqdm import tqdm
 
+from src.parse_string_unic import parse_string_with_unicode
 from src.process_cedict import get_cedict_data
 
 def group_cedict_data(cedict_data):
@@ -30,27 +31,10 @@ def get_freqdict(cedict_data, freqlist_fp):
 	output = defaultdict(int)
 	output_ambiguous = defaultdict(list)
 
-	def wordlist_feeder(word, wordlist, verbose=False):
-
-		entry = ''
-		if word in cedict_data['singles_simp']:
-			entry = word
-		elif word in cedict_data['monopairs_simp']:
-			entry = cedict_data['monopairs'][word]
-		elif word in cedict_data['multipair_chars']:
-			entry = f'{word}*'
-		elif verbose:
-			print(f'!! {word}')
-		
-		wordlist.append(entry)
-		return entry
-	
-	def wordlist_feeder2(word, wordlist, verbose=False):
-
-		# breakpoint()
+	def wordlist_feeder1(word, wordlist, verbose=False):
 
 		entry = list()
-		for char in word:
+		for char in parse_string_with_unicode(word):
 			if char in cedict_data['singles_simp']:
 				entry = char
 			elif char in cedict_data['monopairs_simp']:
@@ -65,7 +49,7 @@ def get_freqdict(cedict_data, freqlist_fp):
 				wordlist.append(entry)
 
 		return entry
-
+	
 	with open(freqlist_fp, 'r', encoding='utf-8', newline='') as csvfile:
 		myreader = csv.reader(csvfile, delimiter='\t')
 		for row in tqdm(myreader):
@@ -73,18 +57,17 @@ def get_freqdict(cedict_data, freqlist_fp):
 			word, freq = row
 			wordlist = list()
 
-			if not wordlist_feeder2(word, wordlist):
-				if not wordlist_feeder(word, wordlist):
-					for seq in jieba.cut(word):
-						if not wordlist_feeder(seq, wordlist):
-							for subseq in jieba.cut(word):
-								if not wordlist_feeder(subseq, wordlist):
-									for char in subseq:
-										entry = wordlist_feeder(char, wordlist)
-										if not entry:
-											ent = f'{char}*'
-											wordlist.append(ent)
-											output_ambiguous[char].append(word)
+			if not wordlist_feeder1(word, wordlist):
+				for seq in jieba.cut(word):
+					if not wordlist_feeder1(seq, wordlist):
+						for subseq in jieba.cut(word):
+							if not wordlist_feeder1(seq, wordlist):
+								for char in parse_string_with_unicode(subseq):
+									entry = wordlist_feeder1(char, wordlist)
+									if not entry:
+										ent = f'{char}*'
+										wordlist.append(ent)
+										output_ambiguous[char].append(word)
 
 			for entry in wordlist:
 				output[entry] += int(freq)
@@ -99,12 +82,11 @@ def main():
 	cedict_data = get_cedict_data(cedict_fp)
 	cedict_data = group_cedict_data(cedict_data)
 
-	data, data_ambiguous = get_freqdict(cedict_data, freqlist_fp)
+	freqdict, freqdict_amb = get_freqdict(cedict_data, freqlist_fp)
 
 	fps_names = ('freqdict', 'freqdict_amb')
-	fps = [f'output/freqlist/{locals().get(x, None)}' for x in fps_names]
-
-	datas = [data, data_ambiguous,]
+	fps = [f'output/freqlist/{x}.tsv' for x in fps_names]
+	datas = [freqdict, freqdict_amb,]
 
 	write_bulk_to_file(fps, datas)
 
