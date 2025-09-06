@@ -1,4 +1,4 @@
-def parse_string_with_unicode(s):
+def unicode_parse(s):
     # Disclaimer: ChatGPT-generated portion of code, made when I was but a wee rookie
     parsed_string = list()
     i = 0
