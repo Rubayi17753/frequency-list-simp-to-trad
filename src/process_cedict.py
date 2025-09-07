@@ -4,7 +4,6 @@ from tqdm import tqdm
 import pandas as pd
 from collections import defaultdict, Counter
 
-from src.parse_string_unic import unicode_parse
 from directories import cedict_fp
 
 def build_automaton(keywords):
@@ -59,13 +58,10 @@ def preprocess(df, mode='s2t'):
 
 	def unic():
 		print('Parsing by Unicode')
-		df['chars_t'] = df['word_t'].apply(unicode_parse)
-		df['chars_s'] = df['word_s'].apply(unicode_parse)
+
 		print('Calculating lengths')
-		df['len_t'] = df['chars_t'].apply(len)
-		df['len_s'] = df['chars_s'].apply(len)
 		df['len_t'] = df['word_t'].apply(len)
-		df['len_s'] = df['word_s'].apply(len)
+		df['len_s'] = df['chars_s'].apply(len)
 		return df
 	unic()
 
@@ -73,6 +69,8 @@ def preprocess(df, mode='s2t'):
 
 def create_charlist(df):
 
+	df['chars_t'] = df['word_t'].apply(list)
+	df['chars_s'] = df['word_s'].apply(list)
 	df = df.explode(['chars_t', 'chars_s'])
 	df = df.rename(columns={
     'chars_t': 'char_t',
@@ -86,16 +84,15 @@ def create_charlist(df):
 	
 	return df
 
-def query1(df):
-	fil1 = df[(df['count_s'] > 1) & (df['count_t'] == 1)]
-	fil2 = df[(df['count_s'] == 1) & (df['count_t'] > 1)]
-	fil3 = df[(df['count_s'] > 1) & (df['count_t'] > 1)]
-	return fil1, fil2, fil3
-
 def main():
 
 	df = pd.read_csv(cedict_fp, sep='\t', header=None, names=['cedict_raw'])
 	df, var_dfs = preprocess(df)
+
+	def write():
+		fp = 'output/cedict/data_main.tsv'
+		print(f'Writing to {fp}')
+		df.to_csv(fp, sep='\t', index=False)
 
 	def preview():
 		print(df)
@@ -104,7 +101,13 @@ def main():
 		for fil in query1(df):
 			print(fil)
 
-	def main2():
+	def query1():
+		fil1 = df[(df['count_s'] > 1) & (df['count_t'] == 1)]
+		fil2 = df[(df['count_s'] == 1) & (df['count_t'] > 1)]
+		fil3 = df[(df['count_s'] > 1) & (df['count_t'] > 1)]
+		return fil1, fil2, fil3
+
+	def query2():
 		char_df = create_charlist(df)
 		char_df2 = df[(df['len_s'] > 1) & (df['len_t'] == 1)]
 		char_df2 = char_df2.rename(columns={
@@ -118,6 +121,9 @@ def main():
 		print(char_df)
 		print(char_df2)
 	
+	def query3():
+		print(df[(df['len_t'] != df['len_s'])])
+
 	def fetch_data():
 		df_one_one = df[(df['count_s'] == 1)]
 		df_one_one_chars = df_one_one[(df_one_one['len_s'] == 1)]
@@ -128,5 +134,5 @@ def main():
 
 		df_ambig_words.to_csv('output/cedict/ambig_words.tsv', sep='\t', index=False)
 
-	fetch_data()
+	write()
 	exit()
