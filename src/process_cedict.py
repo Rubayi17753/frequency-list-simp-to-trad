@@ -109,14 +109,14 @@ def main():
 
 	def query2():
 		char_df = create_charlist(df)
-		char_df2 = df[(df['len_s'] > 1) & (df['len_t'] == 1)]
+		char_df2 = df[(df['len_s'] == 1)]
 		char_df2 = char_df2.rename(columns={
 		'chars_t': 'char_t',
 		'chars_s': 'char_s'
 		})		
 
 		char_df = char_df[['char_t', 'char_s']]
-		char_df2 = char_df[['char_t', 'char_s']]
+		char_df2 = char_df2[['char_t', 'char_s']]
 
 		print(char_df)
 		print(char_df2)
@@ -134,5 +134,5 @@ def main():
 
 		df_ambig_words.to_csv('output/cedict/ambig_words.tsv', sep='\t', index=False)
 
-	write()
+	query2()
 	exit()
