@@ -61,7 +61,7 @@ def preprocess(df, mode='s2t'):
 
 		print('Calculating lengths')
 		df['len_t'] = df['word_t'].apply(len)
-		df['len_s'] = df['chars_s'].apply(len)
+		df['len_s'] = df['word_s'].apply(len)
 		return df
 	unic()
 
@@ -121,7 +121,7 @@ def main():
 		print(char_df)
 		print(char_df2)
 	
-	def query3():
+	def verify():
 		print(df[(df['len_t'] != df['len_s'])])
 
 	def fetch_data():
