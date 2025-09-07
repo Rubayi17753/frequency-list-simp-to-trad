@@ -56,14 +56,9 @@ def preprocess(df, mode='s2t'):
 	df['count_t'] = df.groupby('word_t')['word_t'].transform('count')
 	df['count_s'] = df.groupby('word_s')['word_s'].transform('count')
 
-	def unic():
-		print('Parsing by Unicode')
-
-		print('Calculating lengths')
-		df['len_t'] = df['word_t'].apply(len)
-		df['len_s'] = df['word_s'].apply(len)
-		return df
-	unic()
+	print('Calculating lengths')
+	df['len_t'] = df['word_t'].apply(len)
+	df['len_s'] = df['word_s'].apply(len)
 
 	return df, var_dfs
 
@@ -108,19 +103,23 @@ def main():
 		return fil1, fil2, fil3
 
 	def query2():
+
+		print('Running query2')
 		char_df = create_charlist(df)
 		char_df2 = df[(df['len_s'] == 1)]
+
 		char_df2 = char_df2.rename(columns={
-		'chars_t': 'char_t',
-		'chars_s': 'char_s'
-		})		
+		'word_t': 'char_t',
+		'word_s': 'char_s'
+		})	
 
 		char_df = char_df[['char_t', 'char_s']]
 		char_df2 = char_df2[['char_t', 'char_s']]
+		char_diff = char_df[~char_df.apply(tuple, axis=1).isin(char_df2.apply(tuple, axis=1))]
+		
+		print(' '.join(char_diff['char_s'].tolist()))
+		print(' '.join(char_diff['char_t'].tolist()))
 
-		print(char_df)
-		print(char_df2)
-	
 	def verify():
 		print(df[(df['len_t'] != df['len_s'])])
 
