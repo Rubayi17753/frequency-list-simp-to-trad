@@ -3,6 +3,7 @@ import ahocorasick
 from tqdm import tqdm
 import pandas as pd
 from collections import defaultdict, Counter
+from itertools import chain
 
 from directories import cedict_fp
 
@@ -14,7 +15,7 @@ def build_automaton(keywords):
 	automaton.make_automaton()
 	return automaton
 
-keywords = ('old variant of', 'surname')
+keywords = ('old variant of', 'Japanese variant of','variant of', 'surname')
 automaton = build_automaton(keywords)
 def screen_text(text: str) -> bool:
 	# ChatGPT-generated, edited
@@ -30,6 +31,7 @@ def preprocess(df, mode='s2t'):
 	print('Splitting fields')
 	df[['word_pairs', 'pinyin', 'glosses']] = df['cedict_raw'].str.split('`', expand=True)
 	df[['word_t', 'word_s']] = df['word_pairs'].str.split(' ', expand=True)
+	df['pinyin'] = df['pinyin'].apply(lambda x: x.strip('[').strip(']'))
 	df['glosses'] = df['glosses'].str.strip('/')
 	df['glosses'] = df['glosses'].str.split('/', expand=False)
 	del df['cedict_raw']
@@ -49,8 +51,8 @@ def preprocess(df, mode='s2t'):
 
 	print('Agreggate entries')
 	df = df.groupby(['word_t', 'word_s']).agg(
-        pinyin=('pinyin', lambda x: ', '.join(x)),
-        glosses=('glosses', lambda x: '/'.join(x)),
+        pinyin=('pinyin', list),
+        glosses=('glosses', list),
         ).reset_index()
 	
 	df['count_t'] = df.groupby('word_t')['word_t'].transform('count')
@@ -89,6 +91,12 @@ def main():
 		print(f'Writing to {fp}')
 		df.to_csv(fp, sep='\t', index=False)
 
+	def write_var():
+		for keyword, var_df in zip(keywords, var_dfs):
+			fp = f'output/cedict/var_{keyword}.tsv'
+			print(f'Writing to {fp}')
+			var_df.to_csv(fp, sep='\t', index=False)
+
 	def preview():
 		print(df)
 		for _ in var_dfs:
@@ -124,14 +132,63 @@ def main():
 		print(df[(df['len_t'] != df['len_s'])])
 
 	def fetch_data():
+
 		df_one_one = df[(df['count_s'] == 1)]
 		df_one_one_chars = df_one_one[(df_one_one['len_s'] == 1)]
 		df_one_one_words = df_one_one[(df_one_one['len_s'] > 1)]
-		df_ambig = df[(df['count_s'] > 1)]
-		df_ambig_chars = df_ambig[(df_ambig['len_s'] == 1)]
-		df_ambig_words = df_ambig[(df_ambig['len_s'] > 1)]
 
+		df_ambig = df[(df['count_s'] > 1)]
+
+		df_ambig_chars = df_ambig[(df_ambig['len_s'] == 1)]
+		df_ambig_chars = df_ambig_chars.groupby(['word_s',]).agg(
+			words_t=('word_t', list),
+			pinyin=('pinyin', lambda x: list(chain.from_iterable(x))),
+			glosses=('glosses', lambda x: list(chain.from_iterable(x))),
+			).reset_index()
+		
+		df_ambig_words = df_ambig[(df_ambig['len_s'] > 1)]
+		df_ambig_words['glosses'] = df_ambig_words['glosses'].apply(lambda x: ', '.join(x))
+		df_ambig_words['word_s'] = df_ambig_words['word_s'].astype(str)
+		df_ambig_words = df_ambig_words.groupby(['word_s',]).agg(
+			words_t=('word_t', list),
+			pinyin=('pinyin', lambda x: list(dict.fromkeys(chain.from_iterable(x)))),
+			glosses=('glosses', lambda x: list(dict.fromkeys(x))),
+			).reset_index()
+
+		def generate_mapping():
+
+			def mapping(word_s, words_t):
+				result = defaultdict(list)
+
+				for word_t in words_t:
+					for s, t in zip(word_s, word_t):
+						result[s].append(t)
+				result = {s: tuple(dict.fromkeys(tt)) for s, tt in result.items()}
+				return result
+
+			# wrong: df_ambig_words['mapping'] = df_ambig_words[('word_s', 'words_t')].apply(mapping)
+			df_ambig_words['mapping'] = df_ambig_words.apply(lambda row: mapping(row.word_s, row.words_t), axis=1)
+
+		def generate_ambigs_t():
+
+			def ambigs_t(words_t):
+				word1, word2, *_ = words_t
+				return [f'{char1}{char2}' for char1, char2 in zip(word1, word2) if char1 != char2]
+	
+			df_ambig_words['ambigs_t'] = df_ambig_words['words_t'].apply(ambigs_t)
+			df_ambig_words['ambigs_t'] = df_ambig_words['ambigs_t'].copy().apply(lambda x: ' '.join((str(i) for i in x)))
+			df_ambig_words = df_ambig_words.sort_values(by=['ambigs_t'])
+
+			df_ambig_words['len_glosses'] = df_ambig_words['glosses'].apply(len)
+			df_ambig_words['preferred_t'] = ''
+
+			cols = df_ambig_words.columns.tolist()
+			cols = cols[-1:] + cols[:-1]
+			df_ambig_words = df_ambig_words[cols]
+
+		generate_mapping()
+		# df_ambig_words = df_ambig_words[(df_ambig_words['len_glosses'] == 1)]
 		df_ambig_words.to_csv('output/cedict/ambig_words.tsv', sep='\t', index=False)
 
-	query2()
+	fetch_data()
 	exit()
