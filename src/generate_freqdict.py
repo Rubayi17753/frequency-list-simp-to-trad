@@ -28,6 +28,8 @@ def pipeline(segm_s, word_s):
 				entries.extend([(s, t, label) 
 				for s, t in zip(list(segm_s), list(match))])
 
+			break
+
 		else:
 
 			if len(segm_s) == 1:
@@ -50,13 +52,14 @@ def segment(word_s):
 		segms = list()
 
 		for segm in segm_iter:
+
 			entries = pipeline(segm, word_s)
 			if entries:
 				entries_all.extend(entries)
 			else:
 				segms.extend(method(segm))
 
-		print(segms)
+		# print(segms)
 		if segms == list():
 			break
 
@@ -64,8 +67,10 @@ def segment(word_s):
 
 def main():
 
-	print('Loading and processing raw freqlist')
+	print('Loading raw freqlist')
 	df = pd.read_csv(freqlist_fp, encoding='utf-8', sep='\t', header=None, names=['word_s', 'freq'])
+
+	print('Processing raw freqlist')
 	df['entries'] = df['word_s'].apply(segment)
 
 	print(df)
