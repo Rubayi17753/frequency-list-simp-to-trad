@@ -36,6 +36,8 @@ def pipeline(segm_s, word_s):
 				entries.extend([(s, '!', word_s) 
 				for s in segm_s])
 
+				break
+
 			else:
 				pass
 			
