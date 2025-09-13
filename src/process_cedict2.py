@@ -1,12 +1,11 @@
 import pandas as pd
 from collections import defaultdict
 
-from directories import cedict_fp
-from src.process_cedict import preprocess
+import dirs
+from src.process_cedict import process, process_readwrite
 
-def process_ambig(df):
+def agg_ambig(df):
 
-	df = df[(df['len_s'] > 1)]
 	df['glosses'] = df['glosses'].apply(lambda x: ', '.join(x))
 	df['word_s'] = df['word_s'].astype(str)
 	df = df.groupby(['word_s',]).agg(
@@ -14,6 +13,12 @@ def process_ambig(df):
 		# pinyin=('pinyin', lambda x: list(dict.fromkeys(chain.from_iterable(x)))),
 		# glosses=('glosses', lambda x: list(dict.fromkeys(x))),
 		).reset_index()
+	return df
+
+def get_ambig_words(df):
+
+	df = df[(df['len_s'] > 1)]
+	df = agg_ambig(df)
 
 	def mapping(word_s, words_t):
 		result = defaultdict(list)
@@ -27,13 +32,23 @@ def process_ambig(df):
 
 	return df
 
-df = pd.read_csv(cedict_fp, sep='\t', header=None, names=['cedict_raw'])
-df, var_dfs = preprocess(df)
+def get_ambig_chars(df):
+
+	df = df[(df['len_s'] == 1)]
+	df = agg_ambig(df)
+	return df
+
+try:
+	df = pd.read_feather(dirs.cedict_processed_fp)
+except FileNotFoundError:
+	df, var_dfs = process_readwrite()
 
 print('Filtering data')
 df_one_one = df[(df['count_s'] == 1)]
 df_ambig = df[(df['count_s'] > 1)]
-df_ambig = process_ambig(df_ambig)
+df_ambig_words = get_ambig_words(df_ambig)
+df_ambig_chars = get_ambig_chars(df_ambig)
 
 one_one = df_one_one.set_index('word_s')['word_t'].to_dict()
-ambig = df_ambig.set_index('word_s')['mapping'].to_dict()
+ambig_words = df_ambig_words.set_index('word_s')['mapping'].to_dict()
+ambig_chars = df_ambig_chars.set_index('word_s')['words_t'].to_dict()
