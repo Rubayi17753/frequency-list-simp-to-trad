@@ -36,9 +36,9 @@ def pipeline(segm_s, word_s):
 
 				ambig_tt = ambig_chars.get(segm_s, '')
 				if ambig_tt:
-					entries.extend((segm_s, '!', ambig_tt))
+					entries.append((segm_s, '!', ''.join(ambig_tt)))
 				else:
-					entries.extend((segm_s, '!!', word_s))
+					entries.append((segm_s, '!!', word_s))
 
 				break
 
@@ -81,15 +81,16 @@ def main():
 	print('Processing raw freqlist')
 	df['entries'] = df['word_s'].apply(segment)
 
-	print(df)
-	exit()
-
 	print('Explode and aggregate by entry')
 	df = df.explode('entries').copy()
 
 	df = df.groupby('entries').agg(freq=('freq', 'sum')).reset_index()
 	df[['char_s', 'char_t', 'notes']] = df['entries'].apply(pd.Series)
 	del df['entries']
+	df = df.sort_values('freq', ascending=0).reset_index(drop=True)
+
+	print(df)
+	exit()
 
 
 	
